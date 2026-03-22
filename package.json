@@ -5,9 +5,15 @@
     "dev:next": "next dev --turbopack",
     "dev:server": "tsx --watch server.ts",
     "build": "next build",
-    "start": "NODE_ENV=production tsx server.ts"
+    "start": "NODE_ENV=production tsx server.ts",
+    "nextdev": "next dev",
+    "nextbuild": "next build",
+    "nextstart": "next start"
   },
   "dependencies": {
+    "@aws-crypto/sha256-js": "^5.2.0",
+    "@aws-sdk/client-iot-data-plane": "^3.1014.0",
+    "@aws-sdk/signature-v4": "^3.374.0",
     "autoprefixer": "10.4.20",
     "aws-iot-device-sdk": "^2.2.16",
     "dotenv": "^17.3.1",
