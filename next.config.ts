@@ -1,7 +1,10 @@
-import type { NextConfig } from 'next';
+import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  serverExternalPackages: ["aws-iot-device-sdk", "ws"],
+  experimental: {
+    webpackBuildWorker: false,
+  },
 };
 
 export default nextConfig;
