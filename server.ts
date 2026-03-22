@@ -6,12 +6,31 @@ import path from "path";
 import fs from "fs";
 import awsIot from "aws-iot-device-sdk";
 import { config } from "dotenv";
+
+import os from "os";
+
+// ========== Get Local IP ==========
+function getLocalIp(): string {
+  const interfaces = os.networkInterfaces();
+  for (const iface of Object.values(interfaces)) {
+    if (!iface) continue;
+    for (const alias of iface) {
+      if (alias.family === "IPv4" && !alias.internal) {
+        return alias.address;
+      }
+    }
+  }
+  return "unknown";
+}
+
+const localIp = getLocalIp();
+
 config();
 
 const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev });
 const handle = app.getRequestHandler();
-const port = parseInt(process.env.PORT || "3000", 10);
+const port = parseInt(process.env.PORT || "8080", 10);
 
 // ========== Resolve Cert Paths ==========
 const certPath = path.resolve(process.cwd(), process.env.AWS_CERT_PATH!);
@@ -88,8 +107,9 @@ app.prepare().then(() => {
   });
 
   // ========== Start Server ==========
-  server.listen(port, () => {
+  server.listen(port, "0.0.0.0", () => {
     console.log(`✅ Next.js running at  http://localhost:${port}`);
+    console.log(`✅ Next.js running at  http://${localIp}:${port}`);
   });
 
   // ========== Graceful Shutdown ==========

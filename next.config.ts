@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   experimental: {
     webpackBuildWorker: false,
   },
+  // allowedDevOrigins: ["192.168.10.45"],
 };
 
 export default nextConfig;
