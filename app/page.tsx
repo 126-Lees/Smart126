@@ -304,7 +304,7 @@ export default function RemotePage() {
   const fanDevice = `${user}-fan`;
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-start py-8 px-4 gap-5">
+    <div className="min-h-screen bg-white-100 flex flex-col items-center justify-start py-8 px-4 gap-5">
       <h1 className="text-2xl font-semibold text-gray-700 tracking-tight">
         {displayName}'s Room
       </h1>
