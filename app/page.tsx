@@ -291,7 +291,7 @@ function FanRemote({
   );
 }
 
-tsx; // ========== Inner page (reads search params) ==========
+// ========== Inner page (reads search params) ==========
 function RemotePageInner() {
   const trigger = useCooldown(500);
   const searchParams = useSearchParams();
