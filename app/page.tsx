@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 
 async function publish(payload: object) {
   try {
@@ -63,7 +64,13 @@ function FanButton({ label, onClick }: { label: string; onClick: () => void }) {
 }
 
 // ========== Aircon Remote ==========
-function AirconRemote({ trigger }: { trigger: (fn: () => void) => void }) {
+function AirconRemote({
+  trigger,
+  deviceName,
+}: {
+  trigger: (fn: () => void) => void;
+  deviceName: string;
+}) {
   const [temp, setTemp] = useState(25);
   const [pressed, setPressed] = useState<string | null>(null);
   const [screenOn, setScreenOn] = useState(true);
@@ -77,7 +84,7 @@ function AirconRemote({ trigger }: { trigger: (fn: () => void) => void }) {
     trigger(() => {
       flash("on");
       setScreenOn(true);
-      publish({ device: "aircon", signal: { temperature: temp } });
+      publish({ device: deviceName, signal: { temperature: temp } });
     });
   }
 
@@ -85,7 +92,7 @@ function AirconRemote({ trigger }: { trigger: (fn: () => void) => void }) {
     trigger(() => {
       flash("off");
       setScreenOn(false);
-      publish({ device: "aircon", signal: { power: "off" } });
+      publish({ device: deviceName, signal: { power: "off" } });
     });
   }
 
@@ -95,7 +102,7 @@ function AirconRemote({ trigger }: { trigger: (fn: () => void) => void }) {
       flash("up");
       const next = temp + 1;
       setTemp(next);
-      publish({ device: "aircon", signal: { temperature: next } });
+      publish({ device: deviceName, signal: { temperature: next } });
     });
   }
 
@@ -105,7 +112,7 @@ function AirconRemote({ trigger }: { trigger: (fn: () => void) => void }) {
       flash("down");
       const next = temp - 1;
       setTemp(next);
-      publish({ device: "aircon", signal: { temperature: next } });
+      publish({ device: deviceName, signal: { temperature: next } });
     });
   }
 
@@ -180,7 +187,7 @@ function AirconRemote({ trigger }: { trigger: (fn: () => void) => void }) {
           </button>
         </div>
 
-        {/* Temp Up / Down — always clickable */}
+        {/* Temp Up / Down */}
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={handleTempUp}
@@ -203,7 +210,13 @@ function AirconRemote({ trigger }: { trigger: (fn: () => void) => void }) {
 }
 
 // ========== Fan Remote ==========
-function FanRemote({ trigger }: { trigger: (fn: () => void) => void }) {
+function FanRemote({
+  trigger,
+  deviceName,
+}: {
+  trigger: (fn: () => void) => void;
+  deviceName: string;
+}) {
   return (
     <div
       className="w-full flex flex-col items-center p-5 pb-6"
@@ -268,7 +281,7 @@ function FanRemote({ trigger }: { trigger: (fn: () => void) => void }) {
             label={b.label}
             onClick={() =>
               trigger(() =>
-                publish({ device: "fan", signal: { [b.key]: "toggle" } }),
+                publish({ device: deviceName, signal: { [b.key]: "toggle" } }),
               )
             }
           />
@@ -281,11 +294,22 @@ function FanRemote({ trigger }: { trigger: (fn: () => void) => void }) {
 // ========== Page ==========
 export default function RemotePage() {
   const trigger = useCooldown(500);
+  const searchParams = useSearchParams();
+
+  const user = searchParams.get("user") ?? "unknown";
+  const displayName =
+    user.charAt(0).toUpperCase() + user.slice(1).toLowerCase();
+
+  const airconDevice = `${user}-aircon`;
+  const fanDevice = `${user}-fan`;
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-start py-8 px-4 gap-5">
-      <AirconRemote trigger={trigger} />
-      <FanRemote trigger={trigger} />
+      <h1 className="text-2xl font-semibold text-gray-700 tracking-tight">
+        {displayName}'s Room
+      </h1>
+      <AirconRemote trigger={trigger} deviceName={airconDevice} />
+      <FanRemote trigger={trigger} deviceName={fanDevice} />
     </div>
   );
 }
