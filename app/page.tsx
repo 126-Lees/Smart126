@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
 async function publish(payload: object) {
@@ -291,8 +291,8 @@ function FanRemote({
   );
 }
 
-// ========== Page ==========
-export default function RemotePage() {
+tsx; // ========== Inner page (reads search params) ==========
+function RemotePageInner() {
   const trigger = useCooldown(500);
   const searchParams = useSearchParams();
 
@@ -300,16 +300,28 @@ export default function RemotePage() {
   const displayName =
     user.charAt(0).toUpperCase() + user.slice(1).toLowerCase();
 
-  const airconDevice = `${user}-aircon`;
-  const fanDevice = `${user}-fan`;
-
   return (
-    <div className="min-h-screen bg-white-100 flex flex-col items-center justify-start py-8 px-4 gap-5">
+    <div className="min-h-screen bg-white flex flex-col items-center justify-start py-8 px-4 gap-5">
       <h1 className="text-2xl font-semibold text-gray-700 tracking-tight">
         {displayName}'s Room
       </h1>
-      <AirconRemote trigger={trigger} deviceName={airconDevice} />
-      <FanRemote trigger={trigger} deviceName={fanDevice} />
+      <AirconRemote trigger={trigger} deviceName={`${user}-aircon`} />
+      <FanRemote trigger={trigger} deviceName={`${user}-fan`} />
     </div>
+  );
+}
+
+// ========== Page (wrapped in Suspense) ==========
+export default function RemotePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-white flex items-center justify-center text-gray-400">
+          Loading...
+        </div>
+      }
+    >
+      <RemotePageInner />
+    </Suspense>
   );
 }
