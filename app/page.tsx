@@ -1,6 +1,10 @@
 "use client";
-import { useState, useRef, Suspense } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+
+const VALID_USERS = {
+  validUsers: ["jeffrey", "jordan"],
+};
 
 async function publish(payload: object) {
   try {
@@ -14,7 +18,6 @@ async function publish(payload: object) {
   }
 }
 
-// ========== Global cooldown hook ==========
 function useCooldown(ms: number = 1500) {
   const cooling = useRef(false);
 
@@ -30,7 +33,6 @@ function useCooldown(ms: number = 1500) {
   return trigger;
 }
 
-// ========== Fan Button ==========
 function FanButton({ label, onClick }: { label: string; onClick: () => void }) {
   const [lit, setLit] = useState(false);
   const [pressed, setPressed] = useState(false);
@@ -63,7 +65,6 @@ function FanButton({ label, onClick }: { label: string; onClick: () => void }) {
   );
 }
 
-// ========== Aircon Remote ==========
 function AirconRemote({
   trigger,
   deviceName,
@@ -71,9 +72,42 @@ function AirconRemote({
   trigger: (fn: () => void) => void;
   deviceName: string;
 }) {
+  const storageKey = `aircon-settings-${deviceName}`;
+
   const [temp, setTemp] = useState(25);
+  const [fanSpeed, setFanSpeed] = useState(1);
   const [pressed, setPressed] = useState<string | null>(null);
   const [screenOn, setScreenOn] = useState(true);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(storageKey);
+    if (!saved) return;
+
+    try {
+      const settings = JSON.parse(saved);
+      if (typeof settings.temperature === "number")
+        setTemp(settings.temperature);
+      if (typeof settings.fanSpeed === "number") setFanSpeed(settings.fanSpeed);
+      if (typeof settings.screenOn === "boolean")
+        setScreenOn(settings.screenOn);
+    } catch {
+      localStorage.removeItem(storageKey);
+    }
+  }, [storageKey]);
+
+  function saveSettings(next: {
+    temperature?: number;
+    fanSpeed?: number;
+    screenOn?: boolean;
+  }) {
+    const updated = {
+      temperature: next.temperature ?? temp,
+      fanSpeed: next.fanSpeed ?? fanSpeed,
+      screenOn: next.screenOn ?? screenOn,
+    };
+
+    localStorage.setItem(storageKey, JSON.stringify(updated));
+  }
 
   function flash(key: string) {
     setPressed(key);
@@ -84,7 +118,16 @@ function AirconRemote({
     trigger(() => {
       flash("on");
       setScreenOn(true);
-      publish({ device: deviceName, signal: { temperature: temp } });
+      saveSettings({ screenOn: true });
+
+      publish({
+        device: deviceName,
+        signal: {
+          power: "on",
+          temperature: temp,
+          fan: fanSpeed,
+        },
+      });
     });
   }
 
@@ -92,27 +135,70 @@ function AirconRemote({
     trigger(() => {
       flash("off");
       setScreenOn(false);
+      saveSettings({ screenOn: false });
+
       publish({ device: deviceName, signal: { power: "off" } });
     });
   }
 
   function handleTempUp() {
     if (temp >= 31) return;
+
     trigger(() => {
       flash("up");
       const next = temp + 1;
       setTemp(next);
-      publish({ device: deviceName, signal: { temperature: next } });
+      setScreenOn(true);
+      saveSettings({ temperature: next, screenOn: true });
+
+      publish({
+        device: deviceName,
+        signal: {
+          power: "on",
+          temperature: next,
+          fan: fanSpeed,
+        },
+      });
     });
   }
 
   function handleTempDown() {
     if (temp <= 16) return;
+
     trigger(() => {
       flash("down");
       const next = temp - 1;
       setTemp(next);
-      publish({ device: deviceName, signal: { temperature: next } });
+      setScreenOn(true);
+      saveSettings({ temperature: next, screenOn: true });
+
+      publish({
+        device: deviceName,
+        signal: {
+          power: "on",
+          temperature: next,
+          fan: fanSpeed,
+        },
+      });
+    });
+  }
+
+  function handleFanSpeed() {
+    trigger(() => {
+      const next = fanSpeed >= 4 ? 1 : fanSpeed + 1;
+      flash("fanSpeed");
+      setFanSpeed(next);
+      setScreenOn(true);
+      saveSettings({ fanSpeed: next, screenOn: true });
+
+      publish({
+        device: deviceName,
+        signal: {
+          power: "on",
+          temperature: temp,
+          fan: next,
+        },
+      });
     });
   }
 
@@ -135,26 +221,30 @@ function AirconRemote({
         Aircon
       </p>
 
-      {/* Display */}
       <div
-        className="w-full flex items-center justify-center mb-4 transition-colors duration-300"
+        className="w-full flex flex-col items-center justify-center mb-4 transition-colors duration-300"
         style={{
-          height: 80,
+          height: 90,
           background: screenOn ? "#b8d4c0" : "#c8c4bf",
           borderRadius: 8,
           border: `1px solid ${screenOn ? "#90b09a" : "#b0aca7"}`,
         }}
       >
         {screenOn ? (
-          <div className="flex items-baseline gap-1">
-            <span
-              className="font-medium text-[#1a3a24] leading-none"
-              style={{ fontSize: 44, letterSpacing: -2 }}
-            >
-              {temp}
+          <>
+            <div className="flex items-baseline gap-1">
+              <span
+                className="font-medium text-[#1a3a24] leading-none"
+                style={{ fontSize: 44, letterSpacing: -2 }}
+              >
+                {temp}
+              </span>
+              <span className="text-[20px] font-medium text-[#2a5a34]">°C</span>
+            </div>
+            <span className="text-[11px] text-[#2a5a34] tracking-widest uppercase">
+              Fan Speed {fanSpeed}
             </span>
-            <span className="text-[20px] font-medium text-[#2a5a34]">°C</span>
-          </div>
+          </>
         ) : (
           <span className="text-[13px] text-[#888] tracking-widest uppercase">
             Off
@@ -163,7 +253,6 @@ function AirconRemote({
       </div>
 
       <div className="w-full flex flex-col gap-2">
-        {/* On / Off */}
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={handleOn}
@@ -175,6 +264,7 @@ function AirconRemote({
               On
             </span>
           </button>
+
           <button
             onClick={handleOff}
             style={scale("off")}
@@ -187,7 +277,6 @@ function AirconRemote({
           </button>
         </div>
 
-        {/* Temp Up / Down */}
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={handleTempUp}
@@ -196,6 +285,7 @@ function AirconRemote({
           >
             ▲
           </button>
+
           <button
             onClick={handleTempDown}
             style={scale("down")}
@@ -204,12 +294,21 @@ function AirconRemote({
             ▼
           </button>
         </div>
+
+        <button
+          onClick={handleFanSpeed}
+          style={scale("fanSpeed")}
+          className="h-12 rounded-[10px] border border-[#b0aca7] bg-[#dedad5] flex items-center justify-center gap-2 cursor-pointer active:bg-[#ccc8c3]"
+        >
+          <span className="text-xs font-medium uppercase tracking-widest text-[#555]">
+            Fan Speed: {fanSpeed}
+          </span>
+        </button>
       </div>
     </div>
   );
 }
 
-// ========== Fan Remote ==========
 function FanRemote({
   trigger,
   deviceName,
@@ -231,7 +330,6 @@ function FanRemote({
         Wall Fan
       </p>
 
-      {/* Grille */}
       <div
         className="w-full flex items-center justify-center mb-4 overflow-hidden relative"
         style={{
@@ -253,6 +351,7 @@ function FanRemote({
             />
           ))}
         </div>
+
         <div
           className="absolute flex items-center justify-center text-white font-medium"
           style={{
@@ -268,7 +367,6 @@ function FanRemote({
         </div>
       </div>
 
-      {/* Buttons */}
       <div className="w-full flex flex-col gap-2">
         {[
           { label: "Off / On", key: "power" },
@@ -291,27 +389,123 @@ function FanRemote({
   );
 }
 
-// ========== Inner page (reads search params) ==========
-function RemotePageInner() {
-  const trigger = useCooldown(500);
-  const searchParams = useSearchParams();
+function PasswordGate({
+  user,
+  children,
+}: {
+  user: string;
+  children: React.ReactNode;
+}) {
+  const [checked, setChecked] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
-  const user = searchParams.get("user") ?? "unknown";
-  const displayName =
-    user.charAt(0).toUpperCase() + user.slice(1).toLowerCase();
+  const authKey = `remote-authenticated-${user}`;
 
+  useEffect(() => {
+    const loggedIn = localStorage.getItem(authKey) === "true";
+    setUnlocked(loggedIn);
+    setChecked(true);
+  }, [authKey]);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (password === `${user}123`) {
+      localStorage.setItem(authKey, "true");
+      setUnlocked(true);
+      setError("");
+    } else {
+      setError("Invalid password. Contact Jeffrey at @cheeguang on Telegram.");
+    }
+  }
+
+  if (!checked) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center text-gray-400">
+        Loading...
+      </div>
+    );
+  }
+
+  if (!unlocked) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center px-4">
+        <form
+          onSubmit={handleSubmit}
+          className="w-full max-w-[320px] flex flex-col gap-3 p-6 rounded-2xl border border-gray-200 shadow-sm"
+        >
+          <h1 className="text-xl font-semibold text-gray-700">
+            Enter Password
+          </h1>
+
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="h-12 rounded-lg border border-gray-300 px-3 text-gray-700 outline-none focus:border-gray-500"
+            placeholder="Password"
+          />
+
+          {error && <p className="text-sm text-red-500">{error}</p>}
+
+          <button
+            type="submit"
+            className="h-12 rounded-lg bg-gray-800 text-white font-medium active:bg-gray-700"
+          >
+            Unlock
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
+function InvalidUserUI() {
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center justify-start py-8 px-4 gap-5">
-      <h1 className="text-2xl font-semibold text-gray-700 tracking-tight">
-        {displayName}'s Room
-      </h1>
-      <AirconRemote trigger={trigger} deviceName={`${user}-aircon`} />
-      <FanRemote trigger={trigger} deviceName={`${user}-fan`} />
+    <div className="min-h-screen bg-white flex items-center justify-center px-4">
+      <div className="w-full max-w-[340px] p-6 rounded-2xl border border-gray-200 shadow-sm text-center">
+        <h1 className="text-xl font-semibold text-gray-700 mb-2">
+          Invalid User
+        </h1>
+        <p className="text-sm text-gray-500">
+          Please contact Jeffrey at @cheeguang on Telegram.
+        </p>
+      </div>
     </div>
   );
 }
 
-// ========== Page (wrapped in Suspense) ==========
+function RemotePageInner() {
+  const trigger = useCooldown(500);
+  const searchParams = useSearchParams();
+
+  const user = (searchParams.get("user") ?? "").toLowerCase();
+
+  if (!VALID_USERS.validUsers.includes(user)) {
+    return <InvalidUserUI />;
+  }
+
+  const displayName =
+    user.charAt(0).toUpperCase() + user.slice(1).toLowerCase();
+
+  return (
+    <PasswordGate user={user}>
+      <div className="min-h-screen bg-white flex flex-col items-center justify-start py-8 px-4 gap-5">
+        <h1 className="text-2xl font-semibold text-gray-700 tracking-tight">
+          {displayName}'s Room
+        </h1>
+
+        <AirconRemote trigger={trigger} deviceName={`${user}-aircon`} />
+        <FanRemote trigger={trigger} deviceName={`${user}-fan`} />
+      </div>
+    </PasswordGate>
+  );
+}
+
 export default function RemotePage() {
   return (
     <Suspense
